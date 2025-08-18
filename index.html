@@ -1,10 +1,26 @@
 <!doctype html>
 <html lang="ja">
 <head>
+  <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&display=swap" rel="stylesheet">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>しりとりマン、襲来</title>
   <style>
+    .hint {
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #080d1a;
+  font-weight: 600;
+}
+.card.selectable {
+  outline: 3px dashed #888;
+  cursor: pointer;
+  transform: translateZ(0);
+}
+.card.selectable:hover {
+  outline-color: #333;
+}
     :root { --bg:#0b1020; --card:#121a32; --ink:#e6ecff; --muted:#9fb0ff; --accent:#7aa2ff; --ok:#44d7b6; --warn:#ffce54; --err:#ff6b6b }
     * { box-sizing: border-box; }
     body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color:var(--ink); background: radial-gradient(1200px 600px at 10% -10%, #1b2550 0%, #0b1020 40%, #080d1a 100%); min-height: 100vh; }
@@ -30,7 +46,13 @@
     .cards { display:flex; gap:10px; flex-wrap: wrap; }
     .card { width:72px; height:104px; border-radius:14px; display:flex; align-items:center; justify-content:center; position:relative; user-select:none; background: linear-gradient(180deg, #152045, #101a36); border:1px solid rgba(255,255,255,.16); box-shadow: 0 8px 18px rgba(0,0,0,.4); }
     .card .tag { position:absolute; top:6px; left:8px; font-size: 11px; color: var(--muted); opacity:.9; }
-    .card .big { font-size: 36px; font-weight: 700; letter-spacing: .03em; }
+    .card .big {
+   font-family: 'Mochiy Pop One', 'Noto Sans JP', sans-serif;
+   font-weight: 400;   /* Mochiy Pop One は太さ1種類 */
+   font-size: 30px;    /* 大きさはお好みで */
+   letter-spacing: .03em;
+   text-shadow: 0 1px 0 rgba(0,0,0,.1), 0 2px 6px rgba(0,0,0,.2);
+ }
     .card.kana { background: linear-gradient(180deg, #192a5a, #122149); }
     .card.wildN { background: linear-gradient(180deg, #244a63, #183b5b); }
     .card.wildL { background: linear-gradient(180deg, #5c3f85, #3a2b63); }
@@ -69,6 +91,11 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 
   <script>
+    // 画面内の一時的なUI状態
+const ui = {
+  mode: null,           // 'chooseTopForReset' | null
+  message: '',          // 画面上に出すガイダンス文言
+};
     // =====================
     // ★ ここを書き換え ★
     // =====================
@@ -114,12 +141,12 @@
     const LETTERS_WITH_EXTRA_WA = [...LETTERS, 'わ'];
 
     const WILD_NUMBERS = [
-      { kind:'wildN', value:'ワイルド5' },
-      { kind:'wildN', value:'ワイルド5' },
-      { kind:'wildN', value:'ワイルド6' },
-      { kind:'wildN', value:'ワイルド6' },
-      { kind:'wildN', value:'ワイルド7+' },
-      { kind:'wildN', value:'ワイルド7+' },
+      { kind:'wildN', value:'5' },
+      { kind:'wildN', value:'5' },
+      { kind:'wildN', value:'6' },
+      { kind:'wildN', value:'6' },
+      { kind:'wildN', value:'7+' },
+      { kind:'wildN', value:'7+' },
     ];
 
     const WILD_LINES = [
@@ -193,7 +220,28 @@
         return room;
       });
     }
+async function restartGame(roomId) {
+  await db.ref(`rooms/${roomId}`).transaction(room => {
+    if (!room) return room;
 
+    // 新しい山札を作成して全員に5枚ずつ配る → 場に1枚
+    const deck = buildDeck();
+    const playerIds = Object.keys(room.players || {});
+    for (const pid of playerIds) {
+      room.players[pid].hand = deck.splice(0, 5);
+      room.players[pid].reach = false;
+    }
+    const fieldCard = deck.splice(0, 1)[0];
+
+    room.deck = deck;
+    room.fieldCard = fieldCard;
+    room.basketTop = null;
+    room.lastMove = null;
+    room.started = true;     // いつでも再開できるように true に
+    room.winnerUid = null;   // 勝者をリセット
+    return room;
+  });
+}
     // 山札から1枚引く
     async function drawOne(roomId, pid) {
       await db.ref(`rooms/${roomId}`).transaction(room => {
@@ -385,126 +433,174 @@ async function undoLast(roomId, pid) {
     }
 
     function renderGame(){
-      const root = el('#app'); root.innerHTML='';
-      const room = state.roomSnap?.val(); if (!room) return;
-      const me = room.players?.[state.myUid];
+  const root = el('#app');
+  root.innerHTML='';
 
-      // 上段：場・山札・勝者
-      const top = document.createElement('div'); top.className='grid cols-3';
+  const room = state.roomSnap?.val(); if (!room) return;
+  const me = room.players?.[state.myUid];
 
-      const field = document.createElement('div'); field.className='panel';
-      field.innerHTML = `<div class="section-title">場のカード</div>`;
-      if (room.fieldCard) {
-  const node = cardNode(room.fieldCard);
+  // 上段：場・山札・勝者
+  const top = document.createElement('div'); top.className='grid cols-3';
 
-  // 直前の手を自分が出しており、まだ誰も次の手を出していない & 勝者未確定なら取り消し可
-  const canUndo =
-    room.lastMove &&
-    room.lastMove.pid === state.myUid &&
-    JSON.stringify(room.fieldCard || {}) === JSON.stringify(room.lastMove.card || {}) &&
-    !room.winnerUid;
+  const field = document.createElement('div'); field.className='panel';
+  field.innerHTML = `<div class="section-title">場のカード</div>`;
+  if (room.fieldCard) {
+    const node = cardNode(room.fieldCard);
 
-  if (canUndo) {
-    node.style.cursor = 'pointer';
-    node.title = '直前の一手を取り消す（クリック）';
-    node.onclick = () => undoLast(state.roomId, state.myUid);
+    // 直前の手を自分が出しており、まだ誰も次の手を出していない & 勝者未確定なら取り消し可
+    const canUndo =
+      room.lastMove &&
+      room.lastMove.pid === state.myUid &&
+      JSON.stringify(room.fieldCard || {}) === JSON.stringify(room.lastMove.card || {}) &&
+      !room.winnerUid;
+
+    if (canUndo) {
+      node.style.cursor = 'pointer';
+      node.title = '直前の一手を取り消す（クリック）';
+      node.onclick = () => undoLast(state.roomId, state.myUid);
+    }
+
+    field.appendChild(node);
   }
+  top.appendChild(field);
 
-  field.appendChild(node);
+  const deckBox = document.createElement('div'); deckBox.className='panel';
+  deckBox.innerHTML = `<div class="section-title">山札</div>`;
+  const stack = document.createElement('div'); stack.className='stack';
+  const back = document.createElement('div'); back.className='card back';
+  const count = document.createElement('div'); count.className='count'; count.textContent = `${room.deck?.length||0} 枚`;
+  stack.appendChild(back); stack.appendChild(count); deckBox.appendChild(stack);
+  top.appendChild(deckBox);
+
+  const status = document.createElement('div'); status.className='panel';
+  status.innerHTML = `<div class="section-title">ステータス</div>`;
+  if (room.winnerUid) {
+    const winnerName = room.players?.[room.winnerUid]?.name || '？？？';
+    const win = document.createElement('div'); win.innerHTML = `<strong style="color:var(--ok)">勝者：${winnerName}</strong>`;
+    status.appendChild(win);
+  } else {
+    const hint = document.createElement('div'); hint.className='hint';
+    hint.innerHTML = `3文字以上で <span class="kbd">場の頭</span> → <span class="kbd">自分の末尾</span>。順番なし。`;
+    status.appendChild(hint);
+  }
+  top.appendChild(status);
+
+  root.appendChild(top);
+
+  // 中段：他プレイヤー
+  const others = document.createElement('div'); others.className='panel';
+  others.innerHTML = `<div class="section-title">他のプレイヤー（手札は裏）</div>`;
+  const othersWrap = document.createElement('div'); othersWrap.className='players';
+  for (const [pid,p] of Object.entries(room.players||{})) {
+    if (pid===state.myUid) continue;
+    const d = document.createElement('div'); d.className='player';
+    const backs = new Array((p.hand||[]).length).fill(0).map(()=>'<span class="card small back"></span>').join('');
+    d.innerHTML = `<strong>${p.name}</strong> <span class="pill">${(p.hand||[]).length}枚</span> <span class="pill">${p.reach? 'リーチ宣言中' : '—'}</span> <div class="row">${backs}</div>`
+    othersWrap.appendChild(d);
+  }
+  others.appendChild(othersWrap);
+  root.appendChild(others);
+
+  // 下段：自分の手札と操作
+  const mine = document.createElement('div'); mine.className='panel';
+  mine.innerHTML = `<div class="section-title">自分の手札</div>`;
+  const handDiv = document.createElement('div'); handDiv.className='cards';
+  me?.hand?.forEach((c, idx)=>{
+    const n = cardNode(c);
+    n.title = 'クリックで場に出す（口頭で単語を言いながら！）';
+    n.style.cursor='pointer';
+    n.onclick = ()=> playCard(state.roomId, state.myUid, idx);
+    handDiv.appendChild(n);
+  });
+  mine.appendChild(handDiv);
+
+  const controls = document.createElement('div'); controls.className='row';
+  const drawBtn = document.createElement('button'); drawBtn.textContent = '1枚引く'; drawBtn.onclick=()=>drawOne(state.roomId, state.myUid);
+  const reachBtn = document.createElement('button'); reachBtn.textContent = me?.reach? 'リーチ解除' : 'リーチ宣言'; reachBtn.onclick=()=>toggleReach(state.roomId, state.myUid);
+  const resetBtn = document.createElement('button'); resetBtn.className='danger'; resetBtn.textContent = 'リセット（全捨て→+1枚）';
+
+  // ☆ ダイアログ無しの「選択モード」
+  resetBtn.onclick = () => {
+    if (!me?.hand?.length) return;
+
+    // ガイダンス
+    const msg = document.createElement('div');
+    msg.className = 'hint';
+    msg.style.marginTop = '8px';
+    msg.textContent = 'トップにするカードを選んでください（クリック）';
+    mine.appendChild(msg);
+
+    // キャンセル
+    const cancel = document.createElement('button');
+    cancel.className = 'ghost';
+    cancel.style.marginLeft = '8px';
+    cancel.textContent = '選択をやめる';
+    cancel.onclick = () => render(); // 再描画して通常状態へ
+    msg.appendChild(cancel);
+
+    // 手札カードのクリック挙動を一時的に差し替え
+    const handCards = handDiv.querySelectorAll('.card');
+    handCards.forEach((node, idx) => {
+      node.style.cursor = 'pointer';
+      node.style.outline = '2px solid var(--accent)';
+      node.title = 'クリックでこのカードをトップにする';
+
+      node.onclick = () => {
+        const card = me.hand[idx];
+        if (card?.kind === 'kana') {
+  doReset(state.roomId, state.myUid, idx);
+  render(); // 成功時は再描画して通常状態へ
+} else {
+  // エラーメッセージを画面に表示
+  const err = document.createElement('div');
+  err.className = 'hint';
+  err.style.color = 'var(--err)';     // 赤っぽい文字色
+  err.style.marginTop = '6px';
+  err.textContent = 'ワイルドはトップにできません';
+  mine.appendChild(err);
 }
-      top.appendChild(field);
-
-      const deckBox = document.createElement('div'); deckBox.className='panel';
-      deckBox.innerHTML = `<div class="section-title">山札</div>`;
-      const stack = document.createElement('div'); stack.className='stack';
-      const back = document.createElement('div'); back.className='card back';
-      const count = document.createElement('div'); count.className='count'; count.textContent = `${room.deck?.length||0} 枚`;
-      stack.appendChild(back); stack.appendChild(count); deckBox.appendChild(stack);
-      top.appendChild(deckBox);
-
-      const status = document.createElement('div'); status.className='panel';
-      status.innerHTML = `<div class="section-title">ステータス</div>`;
-      if (room.winnerUid) {
-        const winnerName = room.players?.[room.winnerUid]?.name || '？？？';
-        const win = document.createElement('div'); win.innerHTML = `<strong style="color:var(--ok)">勝者：${winnerName}</strong>`;
-        status.appendChild(win);
-      } else {
-        const hint = document.createElement('div'); hint.className='hint';
-        hint.innerHTML = `3文字以上で <span class="kbd">場の頭</span> → <span class="kbd">自分の末尾</span>。順番なし。`;
-        status.appendChild(hint);
-      }
-      top.appendChild(status);
-
-      root.appendChild(top);
-
-      // 中段：他プレイヤー
-      const others = document.createElement('div'); others.className='panel';
-      others.innerHTML = `<div class="section-title">他のプレイヤー（手札は裏）</div>`;
-      const othersWrap = document.createElement('div'); othersWrap.className='players';
-      for (const [pid,p] of Object.entries(room.players||{})) {
-        if (pid===state.myUid) continue;
-        const d = document.createElement('div'); d.className='player';
-        const backs = new Array((p.hand||[]).length).fill(0).map(()=>'<span class="card small back"></span>').join('');
-        d.innerHTML = `<strong>${p.name}</strong> <span class="pill">${(p.hand||[]).length}枚</span> <span class="pill">${p.reach? 'リーチ宣言中' : '—'}</span> <div class="row">${backs}</div>`
-        othersWrap.appendChild(d);
-      }
-      others.appendChild(othersWrap);
-      root.appendChild(others);
-
-      // 下段：自分の手札と操作
-      const mine = document.createElement('div'); mine.className='panel';
-      mine.innerHTML = `<div class="section-title">自分の手札</div>`;
-      const handDiv = document.createElement('div'); handDiv.className='cards';
-      me?.hand?.forEach((c, idx)=>{
-        const n = cardNode(c);
-        n.title = 'クリックで場に出す（口頭で単語を言いながら！）';
-        n.style.cursor='pointer';
-        n.onclick = ()=> playCard(state.roomId, state.myUid, idx);
-        handDiv.appendChild(n);
-      });
-      mine.appendChild(handDiv);
-
-      const controls = document.createElement('div'); controls.className='row';
-      const drawBtn = document.createElement('button'); drawBtn.textContent = '1枚引く'; drawBtn.onclick=()=>drawOne(state.roomId, state.myUid);
-      const reachBtn = document.createElement('button'); reachBtn.textContent = me?.reach? 'リーチ解除' : 'リーチ宣言'; reachBtn.onclick=()=>toggleReach(state.roomId, state.myUid);
-      const resetBtn = document.createElement('button'); resetBtn.className='danger'; resetBtn.textContent = 'リセット（全捨て→+1枚）';
-      resetBtn.onclick = ()=>{
-        if (!me?.hand?.length) return;
-        // 非ワイルドトップの選択
-        const options = me.hand.map((c,i)=>({i,txt:`${i+1}: ${c.value}${c.kind!=='kana'?'（×ワイルド）':''}`}));
-        const sel = prompt('トップにする非ワイルドカードの番号を入力\n' + options.map(o=>o.txt).join('\n'));
-        const topIdx = Number(sel)-1;
-        if (Number.isFinite(topIdx) && me.hand[topIdx] && me.hand[topIdx].kind==='kana') {
-          doReset(state.roomId, state.myUid, topIdx);
-        } else {
-          alert('非ワイルドの番号を選んでください');
-        }
       };
-      controls.appendChild(drawBtn);
-      controls.appendChild(reachBtn);
-      controls.appendChild(resetBtn);
-      mine.appendChild(controls);
+    });
+  };
 
-      const tips = document.createElement('div'); tips.className='hint';
-      tips.innerHTML = '濁音・半濁音は自由に付け外しOK（例：は/ば/ぱ）。最後の1枚は4文字以上（口頭ルール）。';
-      mine.appendChild(tips);
+  controls.appendChild(drawBtn);
+  controls.appendChild(reachBtn);
+  controls.appendChild(resetBtn);
 
-      root.appendChild(mine);
+  // 最初から（全員）
+  const restartBtn = document.createElement('button');
+  restartBtn.className = 'danger';
+  restartBtn.textContent = '最初から（全員）';
+  restartBtn.onclick = () => {
+    if (confirm('本当に最初からやり直しますか？\n（全員の手札・場・勝者を初期化します）')) {
+      restartGame(state.roomId);
     }
+  };
+  controls.appendChild(restartBtn);
 
-    function render(){
-      if (state.screen==='lobby') renderLobby();
-      if (state.screen==='room') renderRoom();
-      if (state.screen==='game') renderGame();
-    }
+  mine.appendChild(controls);
 
-    function subscribeRoom(){
-      if (!state.roomRef) return;
-      state.roomRef.on('value', snap => { state.roomSnap = snap; if (state.screen!=='lobby') render(); });
-    }
+  const tips = document.createElement('div'); tips.className='hint';
+  tips.innerHTML = '濁音・半濁音は自由に付け外しOK（例：は/ば/ぱ）。最後の1枚は4文字以上（口頭ルール）。';
+  mine.appendChild(tips);
 
-    // 初期表示
-    render();
-  </script>
+  root.appendChild(mine);
+}
+
+// 既存そのまま
+function render(){
+  if (state.screen==='lobby') renderLobby();
+  if (state.screen==='room') renderRoom();
+  if (state.screen==='game') renderGame();
+}
+
+function subscribeRoom(){
+  if (!state.roomRef) return;
+  state.roomRef.on('value', snap => { state.roomSnap = snap; if (state.screen!=='lobby') render(); });
+}
+
+// 初期表示
+render();
+</script>
 </body>
 </html>
