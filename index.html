@@ -1,9 +1,25 @@
 <!doctype html>
 <html lang="ja">
 <head>
+  <meta charset="UTF-8">
+  <title>しりとりゲーム</title>
+  <style>
+    #hand img {
+      width: 100px;
+      height: auto;
+      margin: 5px;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    #hand img:hover {
+      transform: scale(1.1);
+    }
+  </style>
+</head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>しりとりスプリント</title>
+  <title>しりとりマン、襲来</title>
   <style>
     :root { --bg:#0b1020; --card:#121a32; --ink:#e6ecff; --muted:#9fb0ff; --accent:#7aa2ff; --ok:#44d7b6; --warn:#ffce54; --err:#ff6b6b }
     * { box-sizing: border-box; }
@@ -56,12 +72,12 @@
   <div class="container">
     <div class="heading">
       <div class="logo"></div>
-      <h1>しりとりスプリント <small style="font-size:14px;color:var(--muted);font-weight:500">HTML5 / オンライン</small></h1>
+      <h1>しりとりマン、襲来 <small style="font-size:14px;color:var(--muted);font-weight:500">HTML5 / オンライン</small></h1>
     </div>
 
     <div id="app" class="grid"></div>
 
-    <p class="footer">画像は仮のプレースホルダー。ワイルド＆リセットはゲーム進行用のUIのみ。音声通話は別サービスをご利用ください。</p>
+    <p class="footer">おしりぷり～ん</p>
   </div>
 
   <!-- Firebase CDN（ご自身のプロジェクトに置き換えてください） -->
@@ -303,14 +319,27 @@ async function undoLast(roomId, pid) {
 
     function setScreen(s){ state.screen=s; render(); }
 
-    function cardNode(card, small=false) {
-      const div = document.createElement('div');
-      div.className = 'card ' + (small?'small ':'') + (card.kind==='kana'?'kana':card.kind==='wildN'?'wildN':'wildL');
-      const tag = document.createElement('div'); tag.className='tag'; tag.textContent = card.kind==='kana'?'文字':'ワイルド';
-      const big = document.createElement('div'); big.className='big'; big.textContent = card.value;
-      div.appendChild(tag); div.appendChild(big);
-      return div;
-    }
+    function cardNode(card) {
+  const div = document.createElement('div');
+  div.className = 'card';
+
+  // カード画像を使う
+  const img = document.createElement('img');
+  img.src = `cards/${card.id}.png`;  // 画像ファイル名をカードIDに合わせる
+  img.alt = card.word;
+  img.style.width = '100%';
+  img.style.height = 'auto';
+
+  // 画像がない場合に文字を表示するフォールバック
+  img.onerror = () => {
+    img.style.display = 'none';
+    div.textContent = card.word;
+  };
+
+  div.appendChild(img);
+
+  return div;
+}
 
     function renderLobby(){
       const root = el('#app');
@@ -322,7 +351,7 @@ async function undoLast(roomId, pid) {
       nameWrap.innerHTML = `<label>ユーザー名</label><input id="name" placeholder="例：たろう" value="${state.name}">`;
 
       const roomWrap = document.createElement('div');
-      roomWrap.innerHTML = `<label>ルームID（同じIDで集まる）</label><input id="room" placeholder="例：neko123">`;
+      roomWrap.innerHTML = `<label>ルームID（同じIDで集まる）</label><input id="room" placeholder="例：MutekiPass4545">`;
 
       const btnRow = document.createElement('div'); btnRow.className='row';
       const btnJoin = document.createElement('button'); btnJoin.className='primary'; btnJoin.textContent = '入室 / 作成';
@@ -342,9 +371,9 @@ async function undoLast(roomId, pid) {
         <div class="section-title">遊び方（要約）</div>
         <ul>
           <li>各自5枚配布。場のカードの文字で始まり、自分の手札の文字で終わる3文字以上の単語を声で宣言しつつ素早く出す。</li>
-          <li>順番なし。出した人が次の場のカードに。</li>
+          <li>順番なし。</li>
           <li>ワイルド（ナンバー/ライン）とリセット機能あり。</li>
-          <li>最初に手札0枚で勝利（リーチ宣言＆最後4文字以上は口頭ルール）。</li>
+          <li>最初に手札0枚の人が勝利（リーチ宣言＆最後4文字以上は口頭ルール）。</li>
           <li>うん～ち、プリッ</li>
         </ul>
         <p class="hint">※ 正誤判定やチャットは実装していません（ボイスチャット前提）。</p>
