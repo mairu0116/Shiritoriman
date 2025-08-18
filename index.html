@@ -319,26 +319,60 @@ async function undoLast(roomId, pid) {
 
     function setScreen(s){ state.screen=s; render(); }
 
-    function cardNode(card) {
-  const div = document.createElement('div');
-  div.className = 'card';
+   
+function cardNode(card, small = false) {
+    const div = document.createElement('div');
+    div.className =
+      'card ' +
+      (small ? 'small ' : '') +
+      (card.kind === 'kana' ? 'kana' : card.kind === 'wildN' ? 'wildN' : 'wildL');
 
-  // カード画像を使う
-  const img = document.createElement('img');
-  img.src = `cards/${card.id}.png`;  // 画像ファイル名をカードIDに合わせる
-  img.alt = card.word;
-  img.style.width = '100%';
-  img.style.height = 'auto';
+    // テキストのフォールバック要素（画像失敗時に表示）
+    const tag = document.createElement('div');
+    tag.className = 'tag';
+    tag.textContent = card.kind === 'kana' ? '文字' : 'ワイルド';
 
-  // 画像がない場合に文字を表示するフォールバック
-  img.onerror = () => {
-    img.style.display = 'none';
-    div.textContent = card.word;
-  };
+    const big = document.createElement('div');
+    big.className = 'big';
+    big.textContent = card.value;
 
-  div.appendChild(img);
+    // ファイル名の決定
+    let filename = '';
+    if (card.kind === 'kana') {
+      // 例: 「あ」→ あ.png
+      filename = `${card.value}.png`;
+    } else if (card.kind === 'wildL') {
+      // 例: 「あ行」→ あ行.png
+      filename = `${card.value}.png`;
+    } else if (card.kind === 'wildN') {
+      // 生成済みPNG名に合わせる
+      const map = {
+        'ワイルド5': 'wild5.png',
+        'ワイルド6': 'wild6.png',
+        'ワイルド7+': 'wild7plus.png',
+      };
+      filename = map[card.value] || '';
+    }
 
-  return div;
+    // 画像ノード
+    const img = document.createElement('img');
+    // 日本語ファイル名や「+」を安全に読むため encodeURIComponent を使用
+    img.src = `./cards/${encodeURIComponent(filename)}`;
+    img.alt = card.value;
+    img.style.maxWidth = '100%';
+    img.style.maxHeight = '100%';
+
+    // 読み込み失敗 → テキストUIにフォールバック
+    img.onerror = () => {
+      div.innerHTML = '';
+      div.appendChild(tag);
+      div.appendChild(big);
+    };
+
+    div.appendChild(tag);
+    div.appendChild(img);
+    return div;
+  }
 }
 
     function renderLobby(){
