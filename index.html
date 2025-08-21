@@ -1,77 +1,156 @@
 <!doctype html>
 <html lang="ja">
 <head>
-  <link href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka+One&display=swap" rel="stylesheet">
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>しりとりマン、襲来</title>
   <style>
-    .hint {
-  margin: 8px 0 12px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: #080d1a;
-  font-weight: 600;
-}
-.card.selectable {
-  outline: 3px dashed #888;
-  cursor: pointer;
-  transform: translateZ(0);
-}
-.card.selectable:hover {
-  outline-color: #333;
-}
-    :root { --bg:#0b1020; --card:#121a32; --ink:#e6ecff; --muted:#9fb0ff; --accent:#7aa2ff; --ok:#44d7b6; --warn:#ffce54; --err:#ff6b6b }
+    :root {
+      --bg:#fff8e7;
+      --card:#fff1cc;
+      --ink:#4a2e00;
+      --muted:#cc8c33;
+      --accent:#ff9500;
+      --ok:#44d7b6;
+      --warn:#ffb347;
+      --err:#ff6b6b;
+    }
+
     * { box-sizing: border-box; }
-    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN", "Noto Sans JP", sans-serif; color:var(--ink); background: radial-gradient(1200px 600px at 10% -10%, #1b2550 0%, #0b1020 40%, #080d1a 100%); min-height: 100vh; }
+    body {
+      margin:0;
+      font-family: 'Fredoka One', 'Noto Sans JP', sans-serif;
+      color:var(--ink);
+      background: radial-gradient(1200px 600px at 10% -10%, #ffe8a3 0%, #ffd966 40%, #ffcc33 100%);
+      min-height: 100vh;
+    }
+
     .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
     .heading { display:flex; align-items:center; gap:12px; }
-    .logo { width: 36px; height: 36px; border-radius: 10px; background: linear-gradient(135deg, var(--accent), #9ee7ff); filter: drop-shadow(0 6px 20px rgba(122,162,255,.35)); }
-    .panel { background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03)); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:16px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+    .logo {
+      width: 36px; height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), #ffdd66);
+      filter: drop-shadow(0 6px 20px rgba(255,149,0,.35));
+    }
+
+    .panel {
+      background: linear-gradient(180deg, #fffbe6, #fff1cc);
+      border:1px solid #ffd966;
+      border-radius:16px;
+      padding:16px;
+      box-shadow: 0 10px 20px rgba(255, 149, 0,.25);
+    }
+
     .grid { display:grid; gap:16px; }
     .grid.cols-2 { grid-template-columns: 1fr 1fr; }
     .grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
     .row { display:flex; gap:10px; align-items:center; flex-wrap: wrap; }
     .grow { flex:1; }
+
     label { font-size: 12px; color: var(--muted); display:block; margin-bottom:4px; }
-    input, button, select { background: #0f1730; color: var(--ink); border:1px solid rgba(255,255,255,.12); border-radius: 10px; padding: 10px 12px; outline: none; }
-    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(122,162,255,.2); }
+
+    input, button, select {
+      background: #fff7e0;
+      color: var(--ink);
+      border:1px solid #ffcc66;
+      border-radius: 10px;
+      padding: 10px 12px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(255,149,0,.25);
+    }
+
     button { cursor: pointer; font-weight: 600; }
-    .primary { background: linear-gradient(135deg, #5c86ff, #3fb4ff); border: none; }
-    .ghost { background: transparent; border-color: rgba(255,255,255,.2); }
-    .danger { background: linear-gradient(135deg, #ff6b6b, #f78ca0); border: none; }
-    .success { background: linear-gradient(135deg, #44d7b6, #6be6c1); border: none; }
+    .primary {
+      background: linear-gradient(135deg, #ffb84d, #ff9500);
+      border: none;
+      color: #fff;
+    }
+    .ghost { background: transparent; border-color: #ffcc66; }
+    .danger { background: linear-gradient(135deg, #ff6b6b, #ff9999); border: none; color:#fff; }
+    .success { background: linear-gradient(135deg, #44d7b6, #6be6c1); border: none; color:#fff; }
 
     /* Cards */
     .cards { display:flex; gap:10px; flex-wrap: wrap; }
-    .card { width:72px; height:104px; border-radius:14px; display:flex; align-items:center; justify-content:center; position:relative; user-select:none; background: linear-gradient(180deg, #152045, #101a36); border:1px solid rgba(255,255,255,.16); box-shadow: 0 8px 18px rgba(0,0,0,.4); }
-    .card .tag { position:absolute; top:6px; left:8px; font-size: 11px; color: var(--muted); opacity:.9; }
+    .card {
+      width:72px; height:104px;
+      border-radius:14px;
+      display:flex; align-items:center; justify-content:center;
+      position:relative; user-select:none;
+      background: linear-gradient(180deg, #fff2cc, #ffe680);
+      border:2px solid #ffcc33;
+      box-shadow: 0 6px 12px rgba(255,149,0,.35);
+    }
+
+    .card .tag {
+      position:absolute;
+      top:6px; left:8px;
+      font-size: 11px;
+      color: var(--muted);
+      opacity:.9;
+    }
+
     .card .big {
-   font-family: 'Mochiy Pop One', 'Noto Sans JP', sans-serif;
-   font-weight: 400;   /* Mochiy Pop One は太さ1種類 */
-   font-size: 30px;    /* 大きさはお好みで */
-   letter-spacing: .03em;
-   text-shadow: 0 1px 0 rgba(0,0,0,.1), 0 2px 6px rgba(0,0,0,.2);
- }
-    .card.kana { background: linear-gradient(180deg, #192a5a, #122149); }
-    .card.wildN { background: linear-gradient(180deg, #244a63, #183b5b); }
-    .card.wildL { background: linear-gradient(180deg, #5c3f85, #3a2b63); }
-    .card.back { background: linear-gradient(180deg, #0c1531, #0a1229); border-style:dashed; }
+      font-family: 'Fredoka One', 'Noto Sans JP', sans-serif;
+      font-weight: 400;
+      font-size: 30px;
+      letter-spacing: .03em;
+      text-shadow: 0 1px 0 rgba(255,255,255,.8), 0 2px 6px rgba(255,200,0,.4);
+    }
+
+    .card.kana { background: linear-gradient(180deg, #ffe680, #ffd24d); }
+    .card.wildN { background: linear-gradient(180deg, #ffcc99, #ffb347); }
+    .card.wildL { background: linear-gradient(180deg, #ffb3b3, #ff8080); }
+    .card.back { background: linear-gradient(180deg, #ffebcc, #ffd966); border-style:dashed; }
     .card.small { width:56px; height:80px; }
 
     .stack { display:flex; align-items:center; gap:12px; }
-    .stack .count { background:#0d1531; border:1px solid rgba(255,255,255,.1); padding:6px 10px; border-radius:999px; font-size:12px; color:var(--muted); }
+    .stack .count {
+      background:#fff2cc;
+      border:1px solid #ffcc66;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:12px;
+      color:var(--muted);
+    }
 
     .section-title { font-size: 14px; color: var(--muted); margin: 6px 0 8px; letter-spacing: .06em; text-transform: uppercase; }
 
     .players { display:flex; gap:10px; flex-wrap:wrap; }
-    .player { background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px; }
-    .pill { font-size:11px; padding:4px 8px; border-radius:999px; background:#0e1640; color:var(--muted); border:1px solid rgba(255,255,255,.1) }
+    .player {
+      background: #fffaf0;
+      border:1px solid #ffd966;
+      border-radius:12px;
+      padding:10px 12px;
+      display:flex; align-items:center; gap:10px;
+    }
+
+    .pill {
+      font-size:11px;
+      padding:4px 8px;
+      border-radius:999px;
+      background:#fff2cc;
+      color:var(--muted);
+      border:1px solid #ffcc66;
+    }
 
     .hint { color:var(--muted); font-size:13px; }
-    .kbd { border:1px solid rgba(255,255,255,.2); border-bottom-width:2px; padding:2px 6px; border-radius:6px; background: rgba(255,255,255,.06); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px }
+    .kbd {
+      border:1px solid #ffcc66;
+      border-bottom-width:2px;
+      padding:2px 6px;
+      border-radius:6px;
+      background: #fff7e0;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+      font-size:12px;
+    }
 
-    .footer { margin-top: 28px; color: var(--muted); font-size: 12px; text-align:center }
+    .footer { margin-top: 28px; color:var(--muted); font-size: 12px; text-align:center }
   </style>
 </head>
 <body>
@@ -85,6 +164,7 @@
 
     <p class="footer">おしりぷり～ん</p>
   </div>
+
 
   <!-- Firebase CDN（ご自身のプロジェクトに置き換えてください） -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
